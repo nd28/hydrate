@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f2744">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="hydrate">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>hydrate — Water Tracker</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a1628;--surface:#0f2744;--elevated:#1e3a5f;--border:#2d4a6f;
+  --fg:#f0f9ff;--muted:#94a3b8;--accent:#06b6d4;--accent-dim:#0891b2;
+  --water:#3b82f6;--foam:#cffafe;--wave:#22d3ee;--deep:#0c4a6e;
+  --success:#10b981;--warn:#f59e0b;
+}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--fg)}
+
+.app{height:100%;display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative}
+
+/* Header */
+.header{flex-shrink:0;padding:20px 24px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.logo{font-size:24px;font-weight:700;letter-spacing:-0.5px;color:var(--wave)}
+.logo span{color:var(--foam)}.logo span:nth-child(2){color:var(--accent)}
+.settings-btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--elevated);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:all .2s}
+.settings-btn:hover{border-color:var(--accent);transform:scale(1.05)}
+.subtitle{color:var(--muted);font-size:14px}
+
+/* Cards */
+.cards-container{flex:1;position:relative;overflow:hidden}
+.cards{height:100%;display:flex;transition:transform .3s cubic-bezier(0.4,0,0.2,1);touch-action:pan-y}
+.card{min-width:100%;height:100%;padding:20px 24px;overflow-y:auto;scroll-behavior:smooth}
+.card::-webkit-scrollbar{width:0}
+
+.card-title{font-size:28px;font-weight:700;margin-bottom:24px;letter-spacing:-0.5px}
+.tab-indicator{display:flex;justify-content:center;gap:6px;margin-bottom:20px}
+.tab-dot{width:6px;height:6px;border-radius:50%;background:var(--elevated);transition:all .2s}
+.tab-dot.active{width:24px;border-radius:3px;background:var(--accent)}
+
+/* Progress Ring */
+.progress-container{display:flex;flex-direction:column;align-items:center;margin-bottom:28px;padding:30px;background:var(--surface);border-radius:24px;border:1px solid var(--border);position:relative;overflow:hidden}
+.progress-container::before{content:'';position:absolute;bottom:0;left:0;right:0;height:30%;background:linear-gradient(to top,var(--deep),transparent);pointer-events:none}
+
+.progress-ring{position:relative;width:200px;height:200px;margin-bottom:20px}
+.progress-ring svg{transform:rotate(-90deg);filter:drop-shadow(0 0 20px var(--accent))}
+.progress-ring-bg{fill:none;stroke:var(--elevated);stroke-width:12}
+.progress-ring-fill{fill:none;stroke:url(#waveGradient);stroke-width:12;stroke-linecap:round;transition:stroke-dashoffset .8s cubic-bezier(0.4,0,0.2,1)}
+
+@keyframes wave{0%,100%{transform:rotate(-90deg)}50%{transform:rotate(-85deg)}}
+.progress-ring.wave .progress-ring-fill{animation:wave 3s ease-in-out infinite}
+
+.progress-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.progress-value{font-size:56px;font-weight:800;line-height:1;color:var(--foam)}
+.progress-label{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.progress-percent{font-size:24px;font-weight:700;color:var(--accent);margin-top:8px}
+
+.weather-badge{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--elevated);border-radius:20px;font-size:13px;color:var(--wave);border:1px solid var(--border)}
+.weather-badge.hot{color:var(--warn);border-color:var(--warn)}
+.target-text{font-size:15px;color:var(--muted);margin-top:12px;text-align:center}
+
+/* Quick Actions */
+.quick-add{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.add-btn{position:relative;padding:20px 12px;background:var(--surface);border:2px solid var(--border);border-radius:16px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:8px}
+.add-btn:active{transform:scale(0.95)}
+.add-btn:hover{border-color:var(--accent);background:var(--elevated)}
+.add-btn .amount{font-size:28px;font-weight:800;color:var(--foam)}
+.add-btn .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+.add-btn.primary{border-color:var(--accent);background:linear-gradient(135deg,var(--surface),var(--deep))}
+
+/* Log */
+.log-list{display:flex;flex-direction:column;gap:10px}
+.log-item{display:flex;align-items:center;gap:16px;padding:16px;background:var(--surface);border-radius:16px;border:1px solid var(--border);animation:slideIn .3s ease}
+@keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+.log-time{flex-shrink:0;width:60px;font-size:14px;color:var(--muted);font-weight:600}
+.log-amount{flex:1;font-size:20px;font-weight:700;color:var(--foam)}
+.log-delete{width:36px;height:36px;border-radius:50%;border:none;background:var(--elevated);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.log-delete:hover{background:var(--warn);color:var(--bg)}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
+.stat-card{padding:20px;background:var(--surface);border-radius:16px;border:1px solid var(--border);text-align:center}
+.stat-value{font-size:36px;font-weight:800;color:var(--accent);line-height:1}
+.stat-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:8px}
+.stat-card.wide{grid-column:span 2}
+.streak{display:flex;align-items:center;justify-content:center;gap:8px}
+.streak-flame{font-size:32px}
+
+/* Chart */
+.chart-container{padding:20px;background:var(--surface);border-radius:16px;border:1px solid var(--border);margin-bottom:24px}
+.chart-title{font-size:14px;color:var(--muted);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px}
+.chart{display:flex;align-items:flex-end;justify-content:space-between;height:120px;gap:8px}
+.chart-bar{flex:1;background:linear-gradient(to top,var(--accent),var(--wave));border-radius:8px 8px 0 0;min-height:4px;position:relative;transition:all .3s ease}
+.chart-bar::after{content:attr(data-day);position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted)}
+
+/* Settings */
+.settings-list{display:flex;flex-direction:column;gap:16px}
+.settings-item{padding:20px;background:var(--surface);border-radius:16px;border:1px solid var(--border)}
+.settings-label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.settings-input{width:100%;padding:14px 16px;font-size:16px;background:var(--elevated);border:1px solid var(--border);border-radius:10px;color:var(--fg);font-family:inherit}
+.settings-input:focus{outline:none;border-color:var(--accent)}
+.settings-row{display:flex;gap:12px}
+.settings-row .settings-input{flex:1}
+.unit-toggle{display:flex;background:var(--elevated);border-radius:10px;padding:4px;gap:4px}
+.unit-option{flex:1;padding:10px 16px;border-radius:8px;border:none;background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.unit-option.active{background:var(--accent);color:var(--bg)}
+
+.reminder-options{display:flex;flex-direction:column;gap:8px}
+.reminder-option{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--elevated);border-radius:10px;cursor:pointer;transition:all .2s;border:2px solid transparent}
+.reminder-option:hover{border-color:var(--border)}
+.reminder-option.selected{border-color:var(--accent);background:var(--surface)}
+.reminder-radio{width:20px;height:20px;border-radius:50%;border:2px solid var(--muted);position:relative;flex-shrink:0}
+.reminder-option.selected .reminder-radio{border-color:var(--accent)}
+.reminder-option.selected .reminder-radio::after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--accent)}
+.reminder-desc{flex:1;font-size:14px}
+.reminder-times{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* Buttons */
+.btn{width:100%;padding:16px;border-radius:12px;border:none;font-size:16px;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:var(--accent);color:var(--bg)}
+.btn-primary:hover{background:var(--wave)}
+.btn-secondary{background:var(--elevated);color:var(--fg);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--accent)}
+.btn-link{background:transparent;color:var(--wave);padding:12px;font-weight:600}
+.btn-link:hover{color:var(--foam)}
+
+/* Setup Overlay */
+.setup-overlay{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;flex-direction:column;padding:40px 24px;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.setup-logo{text-align:center;margin-bottom:40px}
+.setup-logo .icon{font-size:64px;margin-bottom:16px}
+.setup-logo h1{font-size:32px;color:var(--wave);margin-bottom:8px}
+.setup-logo p{color:var(--muted);font-size:16px}
+.setup-form{flex:1;overflow-y:auto}
+.setup-field{margin-bottom:24px}
+.setup-field label{display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+.setup-buttons{display:flex;gap:12px;margin-top:32px}
+.setup-skip{color:var(--muted);text-align:center;margin-top:16px;font-size:14px;cursor:pointer}
+.setup-skip:hover{color:var(--accent)}
+
+/* Bottom Nav */
+.bottom-nav{flex-shrink:0;display:flex;justify-content:space-around;padding:12px 16px 24px;background:var(--surface);border-top:1px solid var(--border)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px;cursor:pointer;transition:all .2s;border-radius:12px}
+.nav-item:hover{background:var(--elevated)}
+.nav-item.active{color:var(--accent)}
+.nav-item.active .nav-icon{color:var(--accent)}
+.nav-icon{font-size:24px;color:var(--muted);transition:color .2s}
+.nav-label{font-size:11px;font-weight:600;color:var(--muted);transition:color .2s}
+.nav-item.active .nav-label{color:var(--accent)}
+
+/* Toast */
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--elevated);color:var(--fg);padding:14px 24px;border-radius:12px;font-size:14px;font-weight:600;opacity:0;transition:all .3s;z-index:200;pointer-events:none;box-shadow:0 10px 40px rgba(0,0,0,.4);border:1px solid var(--border)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Empty State */
+.empty-state{text-align:center;padding:60px 20px}
+.empty-icon{font-size:64px;margin-bottom:16px}
+.empty-title{font-size:20px;font-weight:700;margin-bottom:8px}
+.empty-text{font-size:15px;color:var(--muted);line-height:1.6}
+
+/* Wave animation in background */
+.wave-bg{position:absolute;bottom:0;left:0;right:0;height:100px;background:linear-gradient(to top,var(--deep),transparent);opacity:.5;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header class="header">
+  <div class="header-top">
+    <div class="logo">🌊 <span>hydr</span><span>ate</span></div>
+    <button class="settings-btn" onclick="goToCard(3)" title="Settings">⚙</button>
+  </div>
+  <div class="subtitle" id="headerSubtitle">Stay hydrated</div>
+</header>
+
+<div class="cards-container">
+  <div class="cards" id="cards">
+
+    <!-- Today Card -->
+    <div class="card" id="card-today">
+      <div class="tab-indicator">
+        <div class="tab-dot active"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+      </div>
+
+      <div class="progress-container">
+        <svg width="0" height="0">
+          <defs>
+            <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#0891b2"/>
+              <stop offset="50%" style="stop-color:#06b6d4"/>
+              <stop offset="100%" style="stop-color:#22d3ee"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div class="progress-ring" id="progressRing">
+          <svg width="200" height="200" viewBox="0 0 200 200">
+            <circle class="progress-ring-bg" cx="100" cy="100" r="88"/>
+            <circle class="progress-ring-fill" id="ringFill" cx="100" cy="100" r="88" stroke-dasharray="552.92" stroke-dashoffset="552.92"/>
+          </svg>
+          <div class="progress-text">
+            <div class="progress-value" id="intakeValue">0</div>
+            <div class="progress-label" id="unitLabel">ml</div>
+            <div class="progress-percent" id="percentValue">0%</div>
+          </div>
+        </div>
+        
+        <div class="weather-badge" id="weatherBadge">
+          💧 Base target
+        </div>
+        <div class="target-text" id="targetText">
+          Target: <span id="targetValue">2450</span> <span class="unit">ml</span>
+        </div>
+      </div>
+
+      <div class="quick-add">
+        <button class="add-btn" onclick="addWater(200)">
+          <span class="amount">200</span>
+          <span class="label">Small</span>
+        </button>
+        <button class="add-btn primary" onclick="addWater(350)">
+          <span class="amount">350</span>
+          <span class="label">Medium</span>
+        </button>
+        <button class="add-btn" onclick="addWater(500)">
+          <span class="amount">500</span>
+          <span class="label">Large</span>
+        </button>
+      </div>
+
+      <div class="empty-state" id="welcomeState" style="display:none">
+        <div class="empty-icon">💧</div>
+        <div class="empty-title">First time here?</div>
+        <div class="empty-text">Tap the settings icon to set up your weight and location for personalized targets.</div>
+      </div>
+    </div>
+
+    <!-- Log Card -->
+    <div class="card" id="card-log">
+      <div class="tab-indicator">
+        <div class="tab-dot"></div>
+        <div class="tab-dot active"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+      </div>
+      <div class="card-title">Today's Log</div>
+      <div class="log-list" id="logList">
+        <div class="empty-state">
+          <div class="empty-icon">📝</div>
+          <div class="empty-title">No entries yet</div>
+          <div class="empty-text">Start tracking your water intake today.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Card -->
+    <div class="card" id="card-stats">
+      <div class="tab-indicator">
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot active"></div>
+        <div class="tab-dot"></div>
+      </div>
+      <div class="card-title">Statistics</div>
+      
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="streakValue">0</div>
+          <div class="stat-label">
+            <span class="streak"><span class="streak-flame">🔥</span> Day Streak</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="avgValue">0</div>
+          <div class="stat-label">Daily Average</div>
+        </div>
+        <div class="stat-card wide">
+          <div class="stat-value" id="bestValue">0</div>
+          <div class="stat-label">Best Day Record</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-title">Last 7 Days</div>
+        <div class="chart" id="weekChart"></div>
+      </div>
+    </div>
+
+    <!-- Settings Card -->
+    <div class="card" id="card-settings">
+      <div class="tab-indicator">
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot active"></div>
+      </div>
+      <div class="card-title">Settings</div>
+      
+      <div class="settings-list">
+        <div class="settings-item">
+          <div class="settings-label">⚖️ Body Weight</div>
+          <div class="settings-row">
+            <input type="number" class="settings-input" id="weightInput" value="70" min="20" max="200">
+            <div class="unit-toggle">
+              <button class="unit-option active" data-unit="kg" onclick="setUnit('weight','kg')">kg</button>
+              <button class="unit-option" data-unit="lbs" onclick="setUnit('weight','lbs')">lbs</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-item">
+          <div class="settings-label">📍 City (for weather)</div>
+          <input type="text" class="settings-input" id="cityInput" placeholder="e.g., London, New York">
+        </div>
+
+        <div class="settings-item">
+          <div class="settings-label">🚰 Measurement Unit</div>
+          <div class="unit-toggle">
+            <button class="unit-option active" data-unit="ml" onclick="setUnit('volume','ml')">ml</button>
+            <button class="unit-option" data-unit="oz" onclick="setUnit('volume','oz')">oz</button>
+            <button class="unit-option" data-unit="cups" onclick="setUnit('volume','cups')">cups</button>
+          </div>
+        </div>
+
+        <div class="settings-item">
+          <div class="settings-label">⏰ Reminders</div>
+          <div class="reminder-options" id="reminderOptions">
+            <div class="reminder-option selected" data-schedule="fixed" onclick="selectReminder('fixed')">
+              <div class="reminder-radio"></div>
+              <div class="reminder-desc">
+                <div>Fixed Times</div>
+                <div class="reminder-times">9:00, 13:00, 17:00, 21:00</div>
+              </div>
+            </div>
+            <div class="reminder-option" data-schedule="2h" onclick="selectReminder('2h')">
+              <div class="reminder-radio"></div>
+              <div class="reminder-desc">
+                <div>Every 2 Hours</div>
+                <div class="reminder-times">8:00 - 20:00</div>
+              </div>
+            </div>
+            <div class="reminder-option" data-schedule="3h" onclick="selectReminder('3h')">
+              <div class="reminder-radio"></div>
+              <div class="reminder-desc">
+                <div>Every 3 Hours</div>
+                <div class="reminder-times">8:00, 11:00, 14:00, 17:00, 20:00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-item">
+          <div class="settings-label">☁️ GitHub Sync</div>
+          <input type="password" class="settings-input" id="ghToken" placeholder="GitHub Personal Access Token">
+          <div style="margin-top:8px">
+            <input type="text" class="settings-input" id="ghGistId" placeholder="Gist ID (optional)">
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="saveSettings()">💾 Save Changes</button>
+        <button class="btn btn-secondary" onclick="syncNow()">🔄 Sync Now</button>
+        <button class="btn btn-link" onclick="window.open('https://nd28.github.io/vitd/','_blank')">☀️ Open Vitamin D Tracker</button>
+        <button class="btn btn-secondary" style="background:var(--warn);color:var(--bg);margin-top:20px" onclick="clearAllData()">🗑️ Clear All Data</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Bottom Nav -->
+<nav class="bottom-nav">
+  <div class="nav-item active" onclick="goToCard(0)">
+    <span class="nav-icon">💧</span>
+    <span class="nav-label">Today</span>
+  </div>
+  <div class="nav-item" onclick="goToCard(1)">
+    <span class="nav-icon">📝</span>
+    <span class="nav-label">Log</span>
+  </div>
+  <div class="nav-item" onclick="goToCard(2)">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Stats</span>
+  </div>
+  <div class="nav-item" onclick="goToCard(3)">
+    <span class="nav-icon">⚙️</span>
+    <span class="nav-label">Settings</span>
+  </div>
+</nav>
+
+<!-- Setup Overlay -->
+<div class="setup-overlay" id="setupOverlay" style="display:none">
+  <div class="setup-logo">
+    <div class="icon">🌊</div>
+    <h1>hydrate</h1>
+    <p>Smart water tracking with weather-aware targets</p>
+  </div>
+  
+  <div class="setup-form">
+    <div class="setup-field">
+      <label>What's your weight?</label>
+      <div class="settings-row">
+        <input type="number" class="settings-input" id="setupWeight" value="70" min="20" max="200">
+        <div class="unit-toggle">
+          <button class="unit-option active" data-unit="kg" onclick="setSetupUnit('kg')">kg</button>
+          <button class="unit-option" data-unit="lbs" onclick="setSetupUnit('lbs')">lbs</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="setup-field">
+      <label>Where are you? (for weather adjustments)</label>
+      <input type="text" class="settings-input" id="setupCity" placeholder="e.g., London, Tokyo, Sydney">
+    </div>
+    
+    <div class="setup-field">
+      <label>Preferred unit</label>
+      <div class="unit-toggle">
+        <button class="unit-option active" data-unit="ml" onclick="setSetupVolume('ml')">ml</button>
+        <button class="unit-option" data-unit="oz" onclick="setSetupVolume('oz')">oz</button>
+      </div>
+    </div>
+    
+    <div class="setup-buttons">
+      <button class="btn btn-secondary" onclick="skipSetup()" style="flex:1">Skip</button>
+      <button class="btn btn-primary" onclick="completeSetup()" style="flex:2">Start Tracking</button>
+    </div>
+    
+    <div class="setup-skip" onclick="skipSetup()">Use defaults (70kg, 2450ml target, no weather)</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// Data management
+const STORAGE_KEY = 'hydrate_data';
+const SETTINGS_KEY = 'hydrate_settings';
+const SYNC_KEY = 'hydrate_sync';
+
+function loadData() {
+  try {
+    const d = localStorage.getItem(STORAGE_KEY);
+    return d ? JSON.parse(d) : { entries: {}, history: {} };
+  } catch {
+    return { entries: {}, history: {} };
+  }
+}
+
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadSettings() {
+  try {
+    const s = localStorage.getItem(SETTINGS_KEY);
+    return s ? JSON.parse(s) : getDefaultSettings();
+  } catch {
+    return getDefaultSettings();
+  }
+}
+
+function saveSettingsData(settings) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function getDefaultSettings() {
+  return {
+    weight: 70,
+    weightUnit: 'kg',
+    city: '',
+    volumeUnit: 'ml',
+    reminderSchedule: 'fixed',
+    firstLaunch: true
+  };
+}
+
+function loadSync() {
+  try {
+    return JSON.parse(localStorage.getItem(SYNC_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveSync(sync) {
+  localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
+}
+
+// Unit conversions
+function kgToLbs(kg) { return kg * 2.20462; }
+function lbsToKg(lbs) { return lbs / 2.20462; }
+function mlToOz(ml) { return ml / 29.5735; }
+function ozToMl(oz) { return oz * 29.5735; }
+function mlToCups(ml) { return ml / 240; }
+function formatAmount(ml, unit) {
+  if (unit === 'oz') return Math.round(mlToOz(ml));
+  if (unit === 'cups') return mlToCups(ml).toFixed(1);
+  return Math.round(ml);
+}
+
+function getUnitLabel(unit) {
+  return unit === 'cups' ? 'cups' : unit;
+}
+
+// Calculate target
+function calculateTarget(settings, weather = null) {
+  let weightKg = settings.weightUnit === 'kg' ? settings.weight : lbsToKg(settings.weight);
+  let baseTarget = weightKg * 35; // 35ml per kg
+  
+  let adjustment = 0;
+  let badge = '💧 Base target';
+  
+  if (weather) {
+    if (weather.temp > 25) {
+      adjustment = 400;
+      badge = '🔥 Hot day +400ml';
+    } else if (weather.humidity > 70) {
+      adjustment = 300;
+      badge = '💧 Humid +300ml';
+    }
+  }
+  
+  return {
+    target: Math.round(baseTarget + adjustment),
+    baseTarget: Math.round(baseTarget),
+    adjustment,
+    badge
+  };
+}
+
+// Today key
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// State
+let currentCard = 0;
+let settings = loadSettings();
+let reminderInterval = null;
+
+// Navigation
+function goToCard(n) {
+  currentCard = n;
+  document.getElementById('cards').style.transform = `translateX(-${n * 100}%)`;
+  document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', i === n));
+  document.querySelectorAll('.tab-dot').forEach((el, i) => el.classList.toggle('active', i === n));
+  
+  if (n === 1) renderLog();
+  if (n === 2) renderStats();
+  if (n === 3) loadSettingsIntoForm();
+}
+
+// Swipe support
+let startX = 0;
+const container = document.querySelector('.cards-container');
+container.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+container.addEventListener('touchend', e => {
+  const endX = e.changedTouches[0].clientX;
+  const diff = startX - endX;
+  if (Math.abs(diff) > 50) {
+    if (diff > 0 && currentCard < 3) goToCard(currentCard + 1);
+    if (diff < 0 && currentCard > 0) goToCard(currentCard - 1);
+  }
+}, { passive: true });
+
+// Water tracking
+async function addWater(amount) {
+  const data = loadData();
+  const today = todayKey();
+  
+  if (!data.entries[today]) {
+    data.entries[today] = [];
+  }
+  
+  data.entries[today].push({
+    amount: amount,
+    time: new Date().toTimeString().slice(0, 5),
+    timestamp: Date.now()
+  });
+  
+  saveData(data);
+  
+  // Animate ring
+  const ring = document.getElementById('progressRing');
+  ring.classList.add('wave');
+  setTimeout(() => ring.classList.remove('wave'), 3000);
+  
+  showToast(`💧 +${formatAmount(amount, settings.volumeUnit)} ${getUnitLabel(settings.volumeUnit)}`);
+  
+  // Check if goal reached
+  const total = getTodayTotal();
+  const targetInfo = calculateTarget(settings, await getWeather());
+  if (total >= targetInfo.target && total - amount < targetInfo.target) {
+    setTimeout(() => showToast('🎉 Daily goal reached!'), 1000);
+  }
+  
+  renderToday();
+  syncUp();
+}
+
+function getTodayTotal() {
+  const data = loadData();
+  const today = todayKey();
+  if (!data.entries[today]) return 0;
+  return data.entries[today].reduce((sum, e) => sum + e.amount, 0);
+}
+
+// Weather
+async function getWeather() {
+  if (!settings.city) return null;
+  
+  try {
+    // Geocode city to lat/lon using Open-Meteo geocoding
+    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(settings.city)}&count=1`);
+    const geoData = await geoRes.json();
+    
+    if (!geoData.results || !geoData.results[0]) return null;
+    
+    const { latitude, longitude } = geoData.results[0];
+    
+    // Get current weather
+    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m&timezone=auto`);
+    const weatherData = await weatherRes.json();
+    
+    return {
+      temp: weatherData.current.temperature_2m,
+      humidity: weatherData.current.relative_humidity_2m
+    };
+  } catch (e) {
+    console.error('Weather fetch failed:', e);
+    return null;
+  }
+}
+
+// Rendering
+async function renderToday() {
+  const total = getTodayTotal();
+  const weather = await getWeather();
+  const targetInfo = calculateTarget(settings, weather);
+  
+  // Update ring
+  const circumference = 552.92;
+  const percent = Math.min(total / targetInfo.target, 1);
+  const offset = circumference - (percent * circumference);
+  document.getElementById('ringFill').style.strokeDashoffset = offset;
+  
+  // Update text
+  document.getElementById('intakeValue').textContent = formatAmount(total, settings.volumeUnit);
+  document.getElementById('unitLabel').textContent = getUnitLabel(settings.volumeUnit);
+  document.getElementById('percentValue').textContent = Math.round(percent * 100) + '%';
+  document.getElementById('targetValue').textContent = formatAmount(targetInfo.target, settings.volumeUnit);
+  document.querySelector('.target-text .unit').textContent = getUnitLabel(settings.volumeUnit);
+  
+  // Weather badge
+  const badge = document.getElementById('weatherBadge');
+  badge.textContent = targetInfo.badge;
+  badge.className = 'weather-badge' + (targetInfo.adjustment > 0 ? ' hot' : '');
+  
+  // Update header
+  document.getElementById('headerSubtitle').textContent = 
+    `${formatAmount(total, settings.volumeUnit)}/${formatAmount(targetInfo.target, settings.volumeUnit)} ${getUnitLabel(settings.volumeUnit)} today`;
+}
+
+function renderLog() {
+  const data = loadData();
+  const today = todayKey();
+  const entries = data.entries[today] || [];
+  const list = document.getElementById('logList');
+  
+  if (entries.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📝</div>
+        <div class="empty-title">No entries yet</div>
+        <div class="empty-text">Start tracking your water intake today.</div>
+      </div>
+    `;
+    return;
+  }
+  
+  list.innerHTML = entries.map((entry, i) => `
+    <div class="log-item" style="animation-delay:${i * 0.05}s">
+      <div class="log-time">${entry.time}</div>
+      <div class="log-amount">${formatAmount(entry.amount, settings.volumeUnit)} ${getUnitLabel(settings.volumeUnit)}</div>
+      <button class="log-delete" onclick="deleteEntry(${i})">✕</button>
+    </div>
+  `).reverse().join('');
+}
+
+function deleteEntry(index) {
+  const data = loadData();
+  const today = todayKey();
+  if (data.entries[today]) {
+    data.entries[today].splice(data.entries[today].length - 1 - index, 1);
+    saveData(data);
+    renderLog();
+    renderToday();
+    syncUp();
+  }
+}
+
+function renderStats() {
+  const data = loadData();
+  const entries = data.entries || {};
+  
+  // Calculate streak
+  let streak = 0;
+  const target = calculateTarget(settings).target;
+  
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10);
+    const dayTotal = entries[d] ? entries[d].reduce((s, e) => s + e.amount, 0) : 0;
+    
+    if (i === 0 && dayTotal < target * 0.5) continue; // Today incomplete is OK
+    if (dayTotal >= target * 0.8) {
+      streak++;
+    } else if (i > 0) {
+      break;
+    }
+  }
+  
+  // Calculate average
+  const days = Object.keys(entries).length;
+  const total = Object.values(entries).reduce((sum, day) => sum + day.reduce((s, e) => s + e.amount, 0), 0);
+  const average = days > 0 ? Math.round(total / days) : 0;
+  
+  // Best day
+  let best = 0;
+  Object.values(entries).forEach(day => {
+    const dayTotal = day.reduce((s, e) => s + e.amount, 0);
+    if (dayTotal > best) best = dayTotal;
+  });
+  
+  // Update stats
+  document.getElementById('streakValue').textContent = streak;
+  document.getElementById('avgValue').textContent = formatAmount(average, settings.volumeUnit);
+  document.getElementById('bestValue').textContent = formatAmount(best, settings.volumeUnit);
+  
+  // Render chart
+  const chart = document.getElementById('weekChart');
+  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let chartHTML = '';
+  
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 864e5);
+    const dKey = d.toISOString().slice(0, 10);
+    const dayTotal = entries[dKey] ? entries[dKey].reduce((s, e) => s + e.amount, 0) : 0;
+    const percent = Math.min(dayTotal / target, 1);
+    const dayName = daysOfWeek[d.getDay()];
+    
+    chartHTML += `<div class="chart-bar" style="height:${Math.max(percent * 100, 4)}%" data-day="${dayName}"></div>`;
+  }
+  
+  chart.innerHTML = chartHTML;
+}
+
+// Settings
+function loadSettingsIntoForm() {
+  document.getElementById('weightInput').value = settings.weight;
+  document.getElementById('cityInput').value = settings.city;
+  document.getElementById('ghToken').value = loadSync().token || '';
+  document.getElementById('ghGistId').value = loadSync().gistId || '';
+  
+  // Update unit toggles
+  document.querySelectorAll('[data-unit]').forEach(el => {
+    el.classList.toggle('active', 
+      (el.dataset.unit === settings.weightUnit && el.closest('.settings-item').textContent.includes('Weight')) ||
+      (el.dataset.unit === settings.volumeUnit && el.closest('.settings-item').textContent.includes('Measurement'))
+    );
+  });
+  
+  // Update reminder selection
+  selectReminder(settings.reminderSchedule);
+}
+
+function setUnit(type, unit) {
+  if (type === 'weight') {
+    settings.weightUnit = unit;
+    // Convert value
+    const input = document.getElementById('weightInput');
+    if (unit === 'lbs') {
+      input.value = Math.round(kgToLbs(parseFloat(input.value) || 70));
+    } else {
+      input.value = Math.round(lbsToKg(parseFloat(input.value) || 154));
+    }
+  } else {
+    settings.volumeUnit = unit;
+  }
+  
+  event.target.closest('.unit-toggle').querySelectorAll('.unit-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.unit === unit);
+  });
+}
+
+function selectReminder(schedule) {
+  settings.reminderSchedule = schedule;
+  document.querySelectorAll('.reminder-option').forEach(el => {
+    el.classList.toggle('selected', el.dataset.schedule === schedule);
+  });
+}
+
+function saveSettings() {
+  const weight = parseFloat(document.getElementById('weightInput').value) || 70;
+  if (settings.weightUnit === 'lbs') {
+    settings.weight = Math.round(lbsToKg(weight));
+  } else {
+    settings.weight = weight;
+  }
+  
+  settings.city = document.getElementById('cityInput').value.trim();
+  settings.firstLaunch = false;
+  
+  // Save sync
+  const sync = {
+    token: document.getElementById('ghToken').value.trim(),
+    gistId: document.getElementById('ghGistId').value.trim()
+  };
+  saveSync(sync);
+  
+  saveSettingsData(settings);
+  showToast('Settings saved!');
+  
+  renderToday();
+  scheduleReminders();
+  syncUp();
+}
+
+function syncNow() {
+  syncUp();
+}
+
+function clearAllData() {
+  if (!confirm('Clear all hydration data? This cannot be undone.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(SETTINGS_KEY);
+  localStorage.removeItem(SYNC_KEY);
+  showToast('All data cleared');
+  location.reload();
+}
+
+// Setup
+function showSetup() {
+  if (!settings.firstLaunch) return;
+  document.getElementById('setupOverlay').style.display = 'flex';
+}
+
+function skipSetup() {
+  settings.firstLaunch = false;
+  saveSettingsData(settings);
+  document.getElementById('setupOverlay').style.display = 'none';
+  renderToday();
+}
+
+function completeSetup() {
+  const weight = parseFloat(document.getElementById('setupWeight').value) || 70;
+  const setupUnit = document.querySelector('#setupOverlay .unit-option.active[data-unit]');
+  
+  if (setupUnit && setupUnit.dataset.unit === 'lbs') {
+    settings.weight = Math.round(lbsToKg(weight));
+  } else {
+    settings.weight = weight;
+  }
+  
+  settings.city = document.getElementById('setupCity').value.trim();
+  settings.firstLaunch = false;
+  
+  const volumeUnit = document.querySelectorAll('#setupOverlay .unit-option')[2];
+  if (volumeUnit && volumeUnit.classList.contains('active')) {
+    settings.volumeUnit = volumeUnit.dataset.unit;
+  }
+  
+  saveSettingsData(settings);
+  document.getElementById('setupOverlay').style.display = 'none';
+  showToast('Welcome to hydrate! 🌊');
+  renderToday();
+  requestNotificationPermission();
+}
+
+function setSetupUnit(unit) {
+  const input = document.getElementById('setupWeight');
+  const current = parseFloat(input.value) || 70;
+  
+  if (unit === 'lbs') {
+    input.value = Math.round(kgToLbs(current));
+  } else {
+    input.value = Math.round(lbsToKg(current));
+  }
+  
+  document.querySelectorAll('#setupOverlay .unit-toggle:first-child .unit-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.unit === unit);
+  });
+}
+
+function setSetupVolume(unit) {
+  document.querySelectorAll('#setupOverlay .unit-toggle:last-child .unit-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.unit === unit);
+  });
+}
+
+// Notifications
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return false;
+  const result = await Notification.requestPermission();
+  if (result === 'granted') {
+    scheduleReminders();
+  }
+  return result === 'granted';
+}
+
+function scheduleReminders() {
+  if (reminderInterval) clearInterval(reminderInterval);
+  
+  const schedules = {
+    'fixed': [9, 13, 17, 21],
+    '2h': [8, 10, 12, 14, 16, 18, 20],
+    '3h': [8, 11, 14, 17, 20]
+  };
+  
+  const times = schedules[settings.reminderSchedule] || schedules['fixed'];
+  
+  reminderInterval = setInterval(() => {
+    if (Notification.permission !== 'granted') return;
+    
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    
+    // Only check at :00
+    if (minute !== 0) return;
+    
+    // Quiet hours
+    if (hour >= 22 || hour < 7) return;
+    
+    // Check if it's reminder time
+    if (!times.includes(hour)) return;
+    
+    // Check if already hit target (skip reminder)
+    const total = getTodayTotal();
+    const target = calculateTarget(settings).target;
+    if (total >= target * 0.9) return;
+    
+    // Show notification
+    new Notification('💧 hydrate', {
+      body: `Time to drink water! (${formatAmount(target - total, settings.volumeUnit)} ${getUnitLabel(settings.volumeUnit)} to go)`,
+      icon: '/hydrate/icons/icon-192.png',
+      badge: '/hydrate/icons/icon-192.png',
+      tag: 'hydrate-reminder',
+      actions: [
+        { action: 'drink', title: 'I drank 250ml' }
+      ]
+    });
+  }, 60000); // Check every minute
+}
+
+// Sync
+async function syncUp() {
+  const sync = loadSync();
+  if (!sync.token) return;
+  
+  const data = loadData();
+  const payload = {
+    data: data,
+    settings: loadSettings(),
+    lastSync: Date.now()
+  };
+  
+  try {
+    let gistId = sync.gistId;
+    
+    if (!gistId) {
+      const res = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: { Authorization: `token ${sync.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: 'hydrate data sync',
+          public: false,
+          files: { 'hydrate-data.json': { content: JSON.stringify(payload, null, 2) } }
+        })
+      });
+      
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const g = await res.json();
+      sync.gistId = g.id;
+      saveSync(sync);
+    } else {
+      const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `token ${sync.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          files: { 'hydrate-data.json': { content: JSON.stringify(payload, null, 2) } }
+        })
+      });
+      
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    }
+    
+    console.log('Synced to Gist');
+  } catch (e) {
+    console.error('Sync failed:', e);
+    // Try background sync
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.sync.register('hydrate-sync');
+    }
+  }
+}
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/hydrate/sw.js')
+      .then(reg => {
+        console.log('SW registered');
+        
+        // Listen for messages
+        navigator.serviceWorker.addEventListener('message', e => {
+          if (e.data && e.data.type === 'QUICK_ADD') {
+            addWater(e.data.amount || 250);
+          }
+          if (e.data && e.data.type === 'SYNC_REQUIRED') {
+            syncUp();
+          }
+        });
+      })
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+
+// Toast
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// Init
+showSetup();
+renderToday();
+</script>
+</body>
+</html>
